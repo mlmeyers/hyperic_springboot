@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plugin [
+  <!ENTITY process-metrics SYSTEM "/pdk/plugins/process-metrics.xml">
+]>
+
+<plugin>
+	<script name="hq-springboot-stat.ps1">
+<![CDATA[
+Param(
+    $SpringBootHost,
+	$SpringBootAdminPort
+)
+$a = Invoke-RestMethod "http://$($SpringBootHost):$($SpringBootAdminPort)/metrics"
+$a | gm -MemberType NoteProperty | foreach {
+    $values = $_.Definition.split(" ")
+    if($values.count -gt 1)
+    {
+        $values[1]
+    }else{
+        Write-Error "Missing Value Pair $_"
+    }
+}
+]]>
+	</script>
+	
+    <filter name="template" value="exec:timeout=10,file=pdk/work/scripts/springboot/hq-springboot-stat.ps1,args=-SpringBootHost %hostname% -SpringBootAdminPort %adminPort%,exec=Powershell:${alias}"/>
+
+	<metrics name="Metrics">		
+		<metric name="Heap"
+                alias="heap"
+                units="KB"
+                interval="300000"
+                indicator="true"/>
+				
+        <metric name="Heap Committed"
+                alias="heap.committed"
+                units="KB"
+                interval="300000"
+                indicator="true"/>	
+
+        <metric name="Heap Init"
+                alias="heap.init"
+                units="KB"
+                interval="300000"
+                indicator="false"/>	
+				
+		<metric name="Heap Used"
+                alias="heap.used"
+                units="KB"
+                interval="300000"
+                indicator="true"/>
+				
+		<metric name="Http Sessions Active"
+                alias="httpsessions.active"
+                interval="300000"
+				category="THROUGHPUT"
+                indicator="true"/>		
+	
+		<metric name="Http Sessions Max"
+                alias="httpsessions.max"
+                interval="300000"
+				category="THROUGHPUT"
+                indicator="false"/>
+				
+		<metric name="Threads"
+                alias="threads"
+                interval="300000"
+                indicator="true"/>		
+	
+		<metric name="Threads Peak"
+                alias="threads.peak"
+                interval="300000"
+                indicator="true"/>
+				
+		<metric name="Memory"
+                alias="mem"
+				units="KB"
+                interval="300000"
+                indicator="true"/>		
+	
+		<metric name="Memory Free"
+                alias="mem.free"
+				units="KB"
+                interval="300000"
+                indicator="true"/>
+							
+		<metric name="Classes"
+                alias="classes"
+                interval="300000"
+                indicator="true"/>		
+	
+		<metric name="Classes Loaded"
+                alias="classes.loaded"
+                interval="300000"
+                indicator="false"/>
+				
+		<metric name="Classes Unloaded"
+                alias="classes.unloaded"
+                interval="300000"
+                indicator="false"/>				
+				
+		<metric name="GC PS MarkSweep Count"
+                alias="gc.ps_marksweep.count"
+                interval="300000"
+                indicator="false"/>		
+	
+		<metric name="GC PS MarkSweep Time"
+                alias="gc.ps_marksweep.count"
+				units="ms"
+                interval="300000"
+                indicator="false"/>	
+				
+		<metric name="GC PS Scavenge Count"
+                alias="gc.ps_scavenge.count"
+                interval="300000"
+                indicator="false"/>		
+	
+		<metric name="GC Scavenge Time"
+                alias="gc.ps_scavenge.time"
+				units="ms"
+                interval="300000"
+                indicator="false"/>	
+				
+		<metric name="Uptime"
+                alias="uptime"
+				units="ms"
+                interval="300000"
+                indicator="true"/>	
+    </metrics>
+
+    <server name="SpringBoot" version="1.2">
+        <property name="PROC_QUERY" value="State.Name.eq=java,Args.*.eq=org.springframework.boot.loader.JarLauncher"/>
+        <property name="DEFAULT_CONFIG_FILE" value="/conf/application.properties"/>
+        <property name="DEFAULT_LOG_FILE" value="/logs/springboot.log"/>
+        <property name="DEFAULT_PID_FILE" value="/bin/springboot.pid"/>
+        <config>
+            <option name="process.query"
+                    description="PTQL for SpringBoot Process"
+                    default="${PROC_QUERY}"/>
+
+            <option name="hostname"
+                    description="Usually leave as localhost"
+                    default="localhost"/>
+
+            <option name="adminPort"
+                    description="SpringBoot http admin port number. Usually: 9091"
+                    type="int"
+                    default="9091"/>		
+        </config>
+		
+        <plugin type="autoinventory" class="org.hyperic.hq.product.DaemonDetector"/>
+        <plugin type="measurement" class="org.hyperic.hq.product.MeasurementPlugin"/>
+        <plugin type="config_track" class="org.hyperic.hq.product.ConfigFileTrackPlugin"/>
+        <plugin type="log_track" class="org.hyperic.hq.product.LogFileTailPlugin"/>
+				
+        <metric name="Availability"
+                template="sigar:Type=ProcState,Arg=%process.query%:State"
+                category="AVAILABILITY"
+                indicator="true"/>
+	
+        <metrics include="Metrics"/>
+    </server>
+
+    <help name="SpringBoot">
+  Configure Hyperic for monitoring SpringBoot.
+  The port for Springboot is by default 9091, please change the port above if required.
+  For servers that have more than one SpringBoot instance, update the port.
+    </help>
+
+</plugin>
